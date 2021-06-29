@@ -30,7 +30,7 @@
               <el-col :span="3"><span>Task</span></el-col>
               <el-checkbox v-model="sameAsFirst" border @change="TaskToFirst">apply the first to all</el-checkbox>
             </el-row>
-            <div v-for="device in deviceList" :key="device.DeviceID">
+            <div v-for="(device, key) in deviceList" :key="key">
               <el-row style="margin-top:10px">
                 <el-col :span="7"><span>{{ device.DeviceID }}</span></el-col>
                 <el-col :span="7"><span>{{ device.Hostname }}</span></el-col>
@@ -48,26 +48,57 @@
         </el-tab-pane>
         <el-tab-pane label="IPv4" name="IPv4">IPv4 Address
           <el-form label-position="left" label-width="90px" style="width: 90%; margin-left:50px; margin-top:20px">
-            <el-row>
-              <el-radio v-model="ipMethod" label="auto">Automatic (DHCP)</el-radio>
-              <el-radio v-model="ipMethod" label="manual">Manual</el-radio>
-              <el-checkbox v-model="ipSequential" :disabled="ipMethod=='auto'" border @change="TaskToFirst">Sequential IP</el-checkbox>
-            </el-row>
-            <div v-for="(ipArray, key) in agentIp" :key="key">
-              <el-row class="ip-header">
-                <el-col :span="4"><span>{{ key }}</span></el-col>
-              </el-row>
-              <el-row>
-                <el-input
-                  v-for="(segment, index) in ipArray"
-                  :key="index"
-                  v-model="ipArray[index]"
-                  maxlength="3"
-                  :disabled="ipMethod=='auto'"
-                  style="width: 10%"
-                />
-              </el-row>
-            </div>
+            <el-carousel arrow="always" trigger="click" :autoplay="false" height="400px">
+              <el-carousel-item>
+                <el-row class="target-header" type="flex" align="middle" justify="center">
+                  <el-col :span="5"><span>Device ID</span></el-col>
+                  <el-col :span="5"><span>Interface Type</span></el-col>
+                  <el-col :span="5"><span>IP Method</span></el-col>
+                  <el-col :span="5"><span>Interface Name</span></el-col>
+                </el-row>
+                <div v-for="(device, key) in deviceList" :key="key">
+                  <template v-if="interfaceName[device.DeviceID]">
+                    <el-row type="flex" align="middle" justify="center" style="margin-top:10px">
+                      <el-col :span="5"><span>{{ device.DeviceID }}</span></el-col>
+                      <el-col :span="5"><span>{{ device.ipAddress[interfaceName[device.DeviceID]].deviceType }}</span></el-col>
+                      <el-col :span="5"><span>{{ device.ipAddress[interfaceName[device.DeviceID]].ipMethod }}</span></el-col>
+                      <el-col :span="5">
+                        <el-select v-model="interfaceName[device.DeviceID]" style="width:100%">
+                          <el-option
+                            v-for="item in Object.keys(device.ipAddress)"
+                            :key="item"
+                            :label="item"
+                            :value="item"
+                          />
+                        </el-select>
+                      </el-col>
+                    </el-row>
+                  </template>
+                </div>
+              </el-carousel-item>
+              <el-carousel-item>
+                <el-row type="flex" align="middle" justify="center">
+                  <el-radio v-model="ipMethod" label="auto">Automatic (DHCP)</el-radio>
+                  <el-radio v-model="ipMethod" label="manual">Manual</el-radio>
+                  <el-checkbox v-model="ipSequential" :disabled="ipMethod=='auto'" border @change="TaskToFirst">Sequential IP</el-checkbox>
+                </el-row>
+                <div v-for="(ipArray, key) in agentIp" :key="key">
+                  <el-row class="ip-header" type="flex" justify="center">
+                    <el-col :span="10"><span>{{ key }}</span></el-col>
+                  </el-row>
+                  <el-row type="flex" justify="center">
+                    <el-input
+                      v-for="(segment, index) in ipArray"
+                      :key="index"
+                      v-model="ipArray[index]"
+                      maxlength="3"
+                      :disabled="ipMethod=='auto'"
+                      style="width: 10%"
+                    />
+                  </el-row>
+                </div>
+              </el-carousel-item>
+            </el-carousel>
           </el-form>
         </el-tab-pane>
       </el-tabs>
@@ -85,7 +116,7 @@
 </template>
 
 <script>
-import { setConfigSame, setConfigDiff, setConfigSequential } from '@/api/robots'
+import { setConfigSame, setConfigDiff } from '@/api/robots'
 import waves from '@/directive/waves' // waves directive
 import agentItem from '../../mixins/agent'
 
@@ -112,7 +143,7 @@ export default {
       wifiSet: { 'ssid': '', 'password': '' },
       hostname: 'ROSCube',
       waitRequest: false,
-      sameAsAP: true,
+      sameAsAP: false,
       sameAsFirst: false,
       ipSequential: true,
       currentTabName: 'Config',
@@ -122,24 +153,27 @@ export default {
         'Subnet Mask': ['', '', '', ''],
         'Gateway': ['', '', '', '']
       },
-      ipMethod: 'auto'
+      ipMethod: 'auto',
+      interfaceName: {}
     }
   },
   watch: {
     dialogShow(val) {
-      this.AgentCurrentTasks = Object.assign({}, {})
-      if (val) {
-        this.sameAsAP = true
-        this.wifiSet = Object.assign({}, this.tempWifi)
-        this.deviceList.forEach((element) => {
-          this.AgentCurrentTasks[element.DeviceID] = element.current_task
-        })
-      }
       this.sameAsFirst = false
       this.dialogFormVisible = val
     }
   },
   methods: {
+    updateDevice() {
+      this.deviceList.forEach((element) => {
+        this.AgentCurrentTasks[element.DeviceID] = element.current_task
+        this.interfaceName[element.DeviceID] = Object.keys(element.ipAddress)[0]
+      })
+    },
+    clearConfig() {
+      this.AgentCurrentTasks = {}
+      this.interfaceName = {}
+    },
     TaskToFirst(val) {
       if (val) {
         var idList = Object.keys(this.AgentCurrentTasks)
@@ -186,9 +220,9 @@ export default {
 
       setConfigSame(tempData).then(response => {
         if (this.responseVarify(response)) {
-          this.tempWifi['ssid'] = this.wifiSet.ssid
-          this.tempWifi['password'] = this.wifiSet.password
-          this.$emit('syncData', this.currentTabName)
+          this.deviceList.forEach((element) => {
+            element['wifi'] = Object.assign({}, this.wifiSet)
+          })
         }
         this.waitRequest = false
       })
@@ -209,7 +243,9 @@ export default {
       })
     },
     SubmitSettingIp() {
-      var tempData = {}
+      var tempData = { 'device_config_json': {}}
+      var seqNumList = []
+      var validGateway = ''
 
       if (this.ipMethod === 'manual') {
         const prefix = this.checkIpProperty(this.agentIp)
@@ -223,55 +259,71 @@ export default {
           return
         }
 
-        tempData = { 'device_list': Array.from(this.deviceList, device => device.DeviceID.toString(10)) }
-        var configInput = `manual ${this.agentIp['IP Address'].join('.')} ${prefix}`
-
         if (!this.agentIp['Gateway'].every((element) => element === '') && this.checkIpAddress(this.agentIp, 'Gateway')) {
-          configInput = configInput + ' ' + this.agentIp['Gateway'].join('.')
+          validGateway = ` ${this.agentIp['Gateway'].join('.')}`
         }
 
         if (this.ipSequential) {
-          tempData['numbering_config_start'] = { 'ip_address': configInput }
-
-          setConfigSequential(tempData).then(response => {
-            if (this.responseVarify(response)) {
-              Object.assign(this.tempWifi, {
-                'ipMethod': 'manual',
-                'ipArray': this.agentIp
-              })
-              this.$emit('syncData', 'IPv4Seq')
+          this.deviceList.forEach((element, index) => {
+            var seqNum = String(index + +this.agentIp['IP Address'][3])
+            var sequentialIP = `${this.agentIp['IP Address'].slice(0, 3).join('.')}.${seqNum}`
+            var configInput = `manual ${sequentialIP} ${prefix}` + validGateway
+            tempData['device_config_json'][element.DeviceID] = {
+              'ip_address': `${this.interfaceName[element.DeviceID]} ${configInput}`
             }
-            this.waitRequest = false
+            seqNumList.push(seqNum)
           })
         } else {
-          tempData['config_dict'] = { 'ip_address': configInput }
-
-          setConfigSame(tempData).then(response => {
-            if (this.responseVarify(response)) {
-              Object.assign(this.tempWifi, {
-                'ipMethod': 'manual',
-                'ipArray': this.agentIp
-              })
-              this.$emit('syncData', this.currentTabName)
+          this.deviceList.forEach((element) => {
+            var configInput = `manual ${this.agentIp['IP Address'].join('.')} ${prefix}` + validGateway
+            tempData['device_config_json'][element.DeviceID] = {
+              'ip_address': `${this.interfaceName[element.DeviceID]} ${configInput}`
             }
-            this.waitRequest = false
           })
         }
-      } else if (this.ipMethod === 'auto') {
-        tempData = { 'device_list': Array.from(this.deviceList, device => device.DeviceID.toString(10)),
-          'config_dict': { 'ip_address': 'auto' }}
 
-        setConfigSame(tempData).then(response => {
+        setConfigDiff(tempData).then(response => {
           if (this.responseVarify(response)) {
-            Object.assign(this.tempWifi, {
-              'ipMethod': 'auto',
-              'ipArray': {
-                'IP Address': Array(4).fill(''),
-                'Subnet Mask': Array(4).fill(''),
-                'Gateway': Array(4).fill('')
-              }
+            if (this.ipSequential) {
+              this.deviceList.forEach((element, index) => {
+                var seqIpArray = JSON.parse(JSON.stringify(this.agentIp))
+                seqIpArray['IP Address'][3] = seqNumList[index]
+                element['ipAddress'][this.interfaceName[element.DeviceID]] = Object.assign(
+                  element['ipAddress'][this.interfaceName[element.DeviceID]], {
+                    ipMethod: 'manual',
+                    ipArray: seqIpArray
+                  }
+                )
+              })
+            } else {
+              this.deviceList.forEach((element) => {
+                element['ipAddress'][this.interfaceName[element.DeviceID]] = Object.assign(
+                  element['ipAddress'][this.interfaceName[element.DeviceID]], {
+                    ipMethod: 'manual',
+                    ipArray: this.agentIp
+                  }
+                )
+              })
+            }
+          }
+          this.waitRequest = false
+        })
+      } else if (this.ipMethod === 'auto') {
+        this.deviceList.forEach((element) => {
+          tempData['device_config_json'][element.DeviceID] = {
+            'ip_address': `${this.interfaceName[element.DeviceID]} auto`
+          }
+        })
+        setConfigDiff(tempData).then(response => {
+          if (this.responseVarify(response)) {
+            this.deviceList.forEach((element) => {
+              element['ipAddress'][this.interfaceName[element.DeviceID]] = Object.assign(
+                element['ipAddress'][this.interfaceName[element.DeviceID]], {
+                  ipMethod: 'auto',
+                  ipArray: this.emptyAddress
+                }
+              )
             })
-            this.$emit('syncData', this.currentTabName)
           }
           this.waitRequest = false
         })

@@ -1,6 +1,12 @@
 export default {
   data() {
-    return {}
+    return {
+      emptyAddress: {
+        'IP Address': Array(4).fill(''),
+        'Subnet Mask': Array(4).fill(''),
+        'Gateway': Array(4).fill('')
+      }
+    }
   },
   methods: {
     responseVarify(response) {
