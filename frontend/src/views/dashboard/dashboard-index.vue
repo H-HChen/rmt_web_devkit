@@ -45,11 +45,6 @@
           <el-progress :percentage="row.ram" :color="usageColorMethod" />
         </template>
       </el-table-column>
-      <el-table-column label="Battery Level" width="160px" align="center">
-        <template #default="{row}">
-          <el-progress :percentage="99" :color="batteryColorMethod" />
-        </template>
-      </el-table-column>
     </el-table>
 
     <pagination v-show="total>0" :total="total" :page.sync="listQuery.page" :limit.sync="listQuery.limit" @pagination="getList" />
@@ -129,15 +124,6 @@ export default {
         return '#6f7ad3'
       } else {
         return '#f56c6c'
-      }
-    },
-    batteryColorMethod(percentage) {
-      if (percentage < 50) {
-        return '#f56c6c'
-      } else if (percentage < 80) {
-        return '#F9F900'
-      } else {
-        return '#67c23a'
       }
     },
     statusTagMethod(status) {
